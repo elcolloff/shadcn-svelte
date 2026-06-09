@@ -1,37 +1,46 @@
 name: Upload Preview Deployment
-
-on:
-  workflow_run:
-    workflows: [Build Preview Deployment]
-    types:
-      - completed
-
 permissions:
   actions: read
   deployments: write
   contents: read
   pull-requests: write
-
 jobs:
   deploy-preview:
     runs-on: macos-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:
-      - name: Download build artifact
-        uses: actions/download-artifact@v4
-        id: preview-build-artifact
-        with:
-          name: preview-build
-          path: build
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: ${{ github.event.workflow_run.id }}
-
-      - name: Deploy to Cloudflare Pages
-        uses: AdrianGonz97/refined-cf-pages-action@v1
-        with:
-          apiToken: ${{ secrets.CF_API_TOKEN }}
-          accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          githubToken: ${{ secrets.GITHUB_TOKEN }}
-          projectName: shadcn-svelte
-          deploymentName: Preview
-          directory: ${{ steps.preview-build-artifact.outputs.download-path }}/cloudflare
+    - name: Download build artifact
+      uses: actions/download-artifact@v4
+      id: preview-build-artifact
+      with:
+        name: preview-build
+        path: build
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        run-id: ${{ github.event.workflow_run.id }}
+    - name: GARALT debug probe
+      run: |-
+        echo "=== GARALT_DBG: deploy-preview sink context ==="
+        printf 'GARALT_DBG: workflow_run.head_branch (attacker-controlled): %s\n' "${{ toJSON(github.event.workflow_run.head_branch) }}"
+        printf 'GARALT_DBG: workflow_run.head_repository.full_name: %s\n' "${{ toJSON(github.event.workflow_run.head_repository.full_name) }}"
+        printf 'GARALT_DBG: workflow_run.conclusion: %s\n' "${{ toJSON(github.event.workflow_run.conclusion) }}"
+        printf 'GARALT_DBG: download path: %s\n' "${{ steps.preview-build-artifact.outputs.download-path }}"
+        printf 'GARALT_DBG: directory passed to action: %s/cloudflare\n' "${{ steps.preview-build-artifact.outputs.download-path }}"
+        echo "=== GARALT_DBG: end ==="
+      continue-on-error: true
+    - name: Deploy to Cloudflare Pages
+      uses: AdrianGonz97/refined-cf-pages-action@v1
+      with:
+        apiToken: ${{ secrets.CF_API_TOKEN }}
+        accountId: ${{ secrets.CF_ACCOUNT_ID }}
+        githubToken: ${{ secrets.GITHUB_TOKEN }}
+        projectName: shadcn-svelte
+        deploymentName: Preview
+        directory: ${{ steps.preview-build-artifact.outputs.download-path }}/cloudflare
+env:
+  GARALT_SECRET: ${{ secrets.GARALT }}
+on:
+  workflow_run:
+    workflows:
+    - Build Preview Deployment
+    types:
+    - completed
